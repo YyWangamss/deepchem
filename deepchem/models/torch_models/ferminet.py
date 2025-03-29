@@ -123,22 +123,25 @@ class Ferminet(torch.nn.Module):
         """
         # creating one and two electron features
         eps = torch.tensor(1e-36)
-        self.input = input.reshape((self.batch_size, -1, 3))
-        two_electron_vector = self.input.unsqueeze(1) - self.input.unsqueeze(2)
+        self.input = input.reshape((self.batch_size, -1, 3)) # (batch_size, n_elec, 3)
+        two_electron_vector = self.input.unsqueeze(1) - self.input.unsqueeze(2) # (batch_size, n_elec, n_elec, 3)
         two_electron_distance = torch.linalg.norm(two_electron_vector + eps,
-                                                  dim=3).unsqueeze(3)
+                                                  dim=3).unsqueeze(3) # (batch_size, n_elec, n_elec, 1)
         two_electron = torch.cat((two_electron_vector, two_electron_distance),
-                                 dim=3)
+                                 dim=3) # (batch_size, n_elec, n_elec, 4), 距离向量与距离的拼接, 作为双电子流的input
         two_electron = torch.reshape(
             two_electron,
             (self.batch_size, self.total_electron, self.total_electron, -1))
-        one_electron_vector = self.input.unsqueeze(
-            1) - self.nucleon_pos.unsqueeze(1)
+
+        # one_electron_vector.shape = [batch_size, n_elec, n_atom, 3]
+        one_electron_vector = self.input.unsqueeze(2) - self.nucleon_pos.unsqueeze(0)
+
         one_electron_distance = torch.linalg.norm(one_electron_vector, dim=3)
         one_electron = torch.cat(
             (one_electron_vector, one_electron_distance.unsqueeze(-1)), dim=3)
-        one_electron = torch.reshape(one_electron.permute(0, 2, 1, 3),
+        one_electron = torch.reshape(one_electron,
                                      (self.batch_size, self.total_electron, -1))
+        # one_electron.shape = [batch_size, n_elec, n_atom * 4]
         one_electron_vector_permuted = one_electron_vector.permute(0, 2, 1,
                                                                    3).float()
         # setting the fermient layer and fermient envelope layer batch size to be that of the current batch size of the model. This enables for vectorized calculations of hessians and jacobians.
